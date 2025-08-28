@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Interactive Highlight Color Demo</title>
+  <title>Interactive Highlight Color Picker</title>
   <style>
     body {
       margin: 0;
@@ -10,13 +10,14 @@
       justify-content: center;
       align-items: center;
       height: 100vh;
+      overflow: hidden;
     }
     canvas {
       width: 90%;
       max-width: 600px;
       border-radius: 12px;
       box-shadow: 0 0 20px rgba(0,0,0,0.5);
-      touch-action: none; /* prevent zoom/pan on tap */
+      touch-action: none;
     }
     #info {
       position: absolute;
@@ -30,11 +31,66 @@
       font-family: sans-serif;
       font-size: 14px;
     }
+    #dialog {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: #222;
+      color: white;
+      padding: 16px;
+      border-radius: 12px;
+      font-family: sans-serif;
+      display: none;
+      box-shadow: 0 0 30px rgba(0,0,0,0.7);
+    }
+    #dialog h3 {
+      margin-top: 0;
+      margin-bottom: 10px;
+      font-size: 16px;
+    }
+    #dialog label {
+      display: inline-block;
+      width: 20px;
+    }
+    #dialog input {
+      width: 60px;
+      margin: 4px;
+      background: #333;
+      border: 1px solid #555;
+      color: white;
+      border-radius: 6px;
+      padding: 4px;
+    }
+    #dialog button {
+      margin: 8px;
+      padding: 6px 12px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    #okBtn { background: #28a745; color: white; }
+    #cancelBtn { background: #dc3545; color: white; }
   </style>
 </head>
 <body>
   <canvas id="canvas"></canvas>
-  <div id="info">Tap a color to highlight</div>
+  <div id="info">Tap to choose highlight color</div>
+
+  <!-- Dialog -->
+  <div id="dialog">
+    <h3>Choose Color (RGB)</h3>
+    <div>
+      <label>R</label><input type="number" id="rInput" min="0" max="255"><br>
+      <label>G</label><input type="number" id="gInput" min="0" max="255"><br>
+      <label>B</label><input type="number" id="bInput" min="0" max="255"><br>
+    </div>
+    <div style="text-align:center;">
+      <button id="okBtn">OK</button>
+      <button id="cancelBtn">Cancel</button>
+    </div>
+  </div>
 
   <script>
     const canvas = document.getElementById("canvas");
@@ -77,9 +133,9 @@
           (b - target.b)**2
         );
         if (dist > tolerance) {
-          data[i] *= 0.3;   // red
-          data[i+1] *= 0.3; // green
-          data[i+2] *= 0.3; // blue
+          data[i] *= 0.3;
+          data[i+1] *= 0.3;
+          data[i+2] *= 0.3;
         }
       }
 
@@ -87,17 +143,33 @@
       requestAnimationFrame(processFrame);
     }
 
-    // Pick color on tap/click
+    // Dialog handling
+    const dialog = document.getElementById("dialog");
+    const rInput = document.getElementById("rInput");
+    const gInput = document.getElementById("gInput");
+    const bInput = document.getElementById("bInput");
+    const info = document.getElementById("info");
+
     canvas.addEventListener("click", (e) => {
-      const rect = canvas.getBoundingClientRect();
-      const x = Math.floor((e.clientX - rect.left) * (canvas.width / rect.width));
-      const y = Math.floor((e.clientY - rect.top) * (canvas.height / rect.height));
+      // Pre-fill dialog with current target
+      rInput.value = target.r;
+      gInput.value = target.g;
+      bInput.value = target.b;
+      dialog.style.display = "block";
+    });
 
-      const frame = ctx.getImageData(x, y, 1, 1).data;
-      target = { r: frame[0], g: frame[1], b: frame[2] };
+    document.getElementById("okBtn").addEventListener("click", () => {
+      target = {
+        r: parseInt(rInput.value) || 0,
+        g: parseInt(gInput.value) || 0,
+        b: parseInt(bInput.value) || 0
+      };
+      info.textContent = `Highlighting rgb(${target.r},${target.g},${target.b})`;
+      dialog.style.display = "none";
+    });
 
-      document.getElementById("info").textContent =
-        `Highlighting color: rgb(${target.r}, ${target.g}, ${target.b})`;
+    document.getElementById("cancelBtn").addEventListener("click", () => {
+      dialog.style.display = "none";
     });
 
     startCamera();
