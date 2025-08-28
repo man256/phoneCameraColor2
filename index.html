@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Highlight Color Demo</title>
+  <style>
+    body { display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background: #111; }
+    canvas { width: 90%; max-width: 600px; border-radius: 12px; box-shadow: 0 0 20px rgba(0,0,0,0.5); }
+  </style>
+</head>
+<body>
+  <canvas id="canvas"></canvas>
+
+  <script>
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d");
+    const video = document.createElement("video");
+    video.autoplay = true;
+    video.playsInline = true;
+
+    async function startCamera() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+        video.srcObject = stream;
+
+        video.addEventListener("loadeddata", () => {
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+          processFrame();
+        });
+      } catch (err) {
+        console.error("Camera access error:", err);
+      }
+    }
+
+    function processFrame() {
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const frame = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const data = frame.data;
+
+      // 🎨 Choose target color range (e.g., red)
+      const target = { r: 200, g: 50, b: 50 }; // approximate red
+      const tolerance = 80; // bigger = wider range
+
+      for (let i = 0; i < data.length; i += 4) {
+        const r = data[i], g = data[i+1], b = data[i+2];
+
+        // Distance from target color
+        const dist = Math.sqrt(
+          (r - target.r)**2 +
+          (g - target.g)**2 +
+          (b - target.b)**2
+        );
+
+        if (dist > tolerance) {
+          // Not close to target → darken
+          data[i] *= 0.3;     // red
+          data[i+1] *= 0.3;   // green
+          data[i+2] *= 0.3;   // blue
+        }
+        // else → keep color as is (highlighted)
+      }
+
+      ctx.putImageData(frame, 0, 0);
+      requestAnimationFrame(processFrame);
+    }
+
+    startCamera();
+  </script>
+</body>
+</html>
