@@ -1,14 +1,40 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Highlight Color Demo</title>
+  <title>Interactive Highlight Color Demo</title>
   <style>
-    body { display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background: #111; }
-    canvas { width: 90%; max-width: 600px; border-radius: 12px; box-shadow: 0 0 20px rgba(0,0,0,0.5); }
+    body {
+      margin: 0;
+      background: #111;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+    canvas {
+      width: 90%;
+      max-width: 600px;
+      border-radius: 12px;
+      box-shadow: 0 0 20px rgba(0,0,0,0.5);
+      touch-action: none; /* prevent zoom/pan on tap */
+    }
+    #info {
+      position: absolute;
+      bottom: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0,0,0,0.6);
+      color: white;
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-family: sans-serif;
+      font-size: 14px;
+    }
   </style>
 </head>
 <body>
   <canvas id="canvas"></canvas>
+  <div id="info">Tap a color to highlight</div>
 
   <script>
     const canvas = document.getElementById("canvas");
@@ -17,9 +43,14 @@
     video.autoplay = true;
     video.playsInline = true;
 
+    let target = { r: 200, g: 50, b: 50 }; // default red
+    const tolerance = 80;
+
     async function startCamera() {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "environment" }
+        });
         video.srcObject = stream;
 
         video.addEventListener("loadeddata", () => {
@@ -29,6 +60,7 @@
         });
       } catch (err) {
         console.error("Camera access error:", err);
+        alert("Could not access the camera. Use HTTPS or localhost.");
       }
     }
 
@@ -37,32 +69,36 @@
       const frame = ctx.getImageData(0, 0, canvas.width, canvas.height);
       const data = frame.data;
 
-      // 🎨 Choose target color range (e.g., red)
-      const target = { r: 200, g: 50, b: 50 }; // approximate red
-      const tolerance = 80; // bigger = wider range
-
       for (let i = 0; i < data.length; i += 4) {
         const r = data[i], g = data[i+1], b = data[i+2];
-
-        // Distance from target color
         const dist = Math.sqrt(
           (r - target.r)**2 +
           (g - target.g)**2 +
           (b - target.b)**2
         );
-
         if (dist > tolerance) {
-          // Not close to target → darken
-          data[i] *= 0.3;     // red
-          data[i+1] *= 0.3;   // green
-          data[i+2] *= 0.3;   // blue
+          data[i] *= 0.3;   // red
+          data[i+1] *= 0.3; // green
+          data[i+2] *= 0.3; // blue
         }
-        // else → keep color as is (highlighted)
       }
 
       ctx.putImageData(frame, 0, 0);
       requestAnimationFrame(processFrame);
     }
+
+    // Pick color on tap/click
+    canvas.addEventListener("click", (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const x = Math.floor((e.clientX - rect.left) * (canvas.width / rect.width));
+      const y = Math.floor((e.clientY - rect.top) * (canvas.height / rect.height));
+
+      const frame = ctx.getImageData(x, y, 1, 1).data;
+      target = { r: frame[0], g: frame[1], b: frame[2] };
+
+      document.getElementById("info").textContent =
+        `Highlighting color: rgb(${target.r}, ${target.g}, ${target.b})`;
+    });
 
     startCamera();
   </script>
