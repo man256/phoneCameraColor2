@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Full Screen Camera with RGB Range Highlight</title>
+  <title>Full Screen Camera with Multiple Highlight Modes</title>
   <style>
     html, body {
       margin: 0; padding: 0;
@@ -27,53 +27,51 @@
       border-radius: 8px;
       font-size: 14px;
     }
+    #modeBadge {
+      position: absolute;
+      top: 10px; left: 10px;
+      background: rgba(0,0,0,0.7);
+      color: white;
+      padding: 6px 10px;
+      border-radius: 8px;
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    #colorBox1, #colorBox2 {
+      width: 16px; height: 16px;
+      border-radius: 4px;
+      border: 1px solid white;
+    }
     #dialog {
       position: absolute;
       top: 50%; left: 50%;
       transform: translate(-50%, -50%);
       background: #222; color: white;
       width: 80%; max-width: 400px;
-      height: 50%;
+      height: 60%;
       padding: 16px;
       border-radius: 16px;
       display: none;
       box-shadow: 0 0 30px rgba(0,0,0,0.7);
       overflow: auto; z-index: 10;
     }
-    #dialog h3 {
-      margin: 0 0 10px;
-      font-size: 16px;
-      text-align: center;
-    }
-    .row {
-      display: flex;
-      align-items: center;
-      margin: 8px 0;
-    }
-    .row label { width: 30px; }
-    .row input {
+    #dialog h3 { margin: 0 0 10px; text-align: center; }
+    .row { display: flex; align-items: center; margin: 8px 0; }
+    .row label { width: 40px; }
+    .row input, select {
       margin-left: 8px;
-      width: 60px;
-      background: #333; border: 1px solid #555;
-      color: white; border-radius: 6px;
+      background: #333; color: white;
+      border: 1px solid #555; border-radius: 6px;
       padding: 4px;
     }
-    #preview1, #preview2 {
-      height: 30px;
-      border-radius: 8px;
-      margin: 6px 0;
-    }
-    #buttons {
-      text-align: center;
-      margin-top: 10px;
-    }
+    #preview1, #preview2 { height: 30px; border-radius: 8px; margin: 6px 0; }
+    #buttons { text-align: center; margin-top: 10px; }
     #buttons button {
-      margin: 6px;
-      padding: 6px 12px;
-      border: none;
-      border-radius: 8px;
-      cursor: pointer;
-      font-weight: bold;
+      margin: 6px; padding: 6px 12px;
+      border: none; border-radius: 8px;
+      cursor: pointer; font-weight: bold;
     }
     #okBtn { background: #28a745; color: white; }
     #cancelBtn { background: #dc3545; color: white; }
@@ -81,11 +79,15 @@
 </head>
 <body>
   <canvas id="canvas"></canvas>
-  <div id="info">Tap to choose RGB range</div>
+  <div id="modeBadge">
+    <span id="modeLabel">Mode: range</span>
+    <div id="colorBox1"></div>
+    <div id="colorBox2"></div>
+  </div>
+  <div id="info">Tap to configure highlight</div>
 
-  <!-- Dialog -->
   <div id="dialog">
-    <h3>Choose RGB Range</h3>
+    <h3>Highlight Settings</h3>
 
     <div><b>Color 1</b></div>
     <div class="row"><label>R</label><input type="number" id="r1" min="0" max="255"></div>
@@ -103,6 +105,16 @@
       <label>Tol</label><input type="number" id="tolInput" min="0" max="255" value="40">
     </div>
 
+    <div class="row">
+      <label>Mode</label>
+      <select id="modeSelect">
+        <option value="range">RGB Range</option>
+        <option value="distance">Color Distance</option>
+        <option value="between">Between Distance</option>
+        <option value="hue">Hue Range</option>
+      </select>
+    </div>
+
     <div id="buttons">
       <button id="okBtn">OK</button>
       <button id="cancelBtn">Cancel</button>
@@ -110,110 +122,130 @@
   </div>
 
   <script>
-    const canvas = document.getElementById("canvas");
-    const ctx = canvas.getContext("2d");
-    const video = document.createElement("video");
-    video.autoplay = true;
-    video.playsInline = true;
+    const canvas=document.getElementById("canvas");
+    const ctx=canvas.getContext("2d");
+    const video=document.createElement("video");
+    video.autoplay=true; video.playsInline=true;
 
-    let color1 = { r: 200, g: 50, b: 0 };
-    let color2 = { r: 100, g: 25, b: 11 };
-    let tolerance = 4;
+    let color1={r:200,g:50,b:50};
+    let color2={r:100,g:25,b:25};
+    let tolerance=40;
+    let mode="range";
+
+    const modeLabel=document.getElementById("modeLabel");
+    const colorBox1=document.getElementById("colorBox1");
+    const colorBox2=document.getElementById("colorBox2");
+
+    function updateBadge() {
+      modeLabel.textContent=`Mode: ${mode}`;
+      colorBox1.style.backgroundColor=`rgb(${color1.r},${color1.g},${color1.b})`;
+      colorBox2.style.backgroundColor=`rgb(${color2.r},${color2.g},${color2.b})`;
+    }
 
     async function startCamera() {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: "environment" }
-        });
-        video.srcObject = stream;
-
-        video.addEventListener("loadeddata", () => {
-          resizeCanvas();
-          processFrame();
-        });
-      } catch (err) {
-        console.error("Camera error:", err);
-        alert("Could not access the camera. Use HTTPS or localhost.");
+        const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment"}});
+        video.srcObject=stream;
+        video.addEventListener("loadeddata",()=>{resizeCanvas();processFrame();});
+      } catch(err) {
+        console.error("Camera error:",err);
+        alert("Could not access camera. Use HTTPS or localhost.");
       }
     }
 
-    function resizeCanvas() {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
-    }
-    window.addEventListener("resize", resizeCanvas);
+    function resizeCanvas(){canvas.width=window.innerWidth;canvas.height=window.innerHeight;}
+    window.addEventListener("resize",resizeCanvas);
 
-    function inRange(r, g, b) {
-      const rMin = Math.min(color1.r, color2.r) - tolerance;
-      const rMax = Math.max(color1.r, color2.r) + tolerance;
-      const gMin = Math.min(color1.g, color2.g) - tolerance;
-      const gMax = Math.max(color1.g, color2.g) + tolerance;
-      const bMin = Math.min(color1.b, color2.b) - tolerance;
-      const bMax = Math.max(color1.b, color2.b) + tolerance;
-
-      return (
-        r >= rMin && r <= rMax &&
-        g >= gMin && g <= gMax &&
-        b >= bMin && b <= bMax
-      );
-    }
-
-    function processFrame() {
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      const frame = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const data = frame.data;
-
-      for (let i = 0; i < data.length; i += 4) {
-        const r = data[i], g = data[i+1], b = data[i+2];
-        if (!inRange(r, g, b)) {
-          data[i] *= 0.3;
-          data[i+1] *= 0.3;
-          data[i+2] *= 0.3;
-        }
+    function rgbToHue(r,g,b){
+      r/=255; g/=255; b/=255;
+      const max=Math.max(r,g,b), min=Math.min(r,g,b);
+      let h=0, d=max-min;
+      if(d!==0){
+        if(max===r) h=((g-b)/d+(g<b?6:0));
+        else if(max===g) h=((b-r)/d+2);
+        else h=((r-g)/d+4);
+        h/=6;
       }
+      return h*360;
+    }
 
-      ctx.putImageData(frame, 0, 0);
+    function inRange(r,g,b){
+      const rMin=Math.min(color1.r,color2.r)-tolerance;
+      const rMax=Math.max(color1.r,color2.r)+tolerance;
+      const gMin=Math.min(color1.g,color2.g)-tolerance;
+      const gMax=Math.max(color1.g,color2.g)+tolerance;
+      const bMin=Math.min(color1.b,color2.b)-tolerance;
+      const bMax=Math.max(color1.b,color2.b)+tolerance;
+      return r>=rMin&&r<=rMax&&g>=gMin&&g<=gMax&&b>=bMin&&b<=bMax;
+    }
+
+    function colorDistance(r,g,b,c){return Math.sqrt((r-c.r)**2+(g-c.g)**2+(b-c.b)**2);}
+    function inDistance(r,g,b){
+      return colorDistance(r,g,b,color1)<=tolerance||colorDistance(r,g,b,color2)<=tolerance;
+    }
+
+    function inBetween(r,g,b){
+      const A=[color1.r,color1.g,color1.b],B=[color2.r,color2.g,color2.b],P=[r,g,b];
+      const AB=[B[0]-A[0],B[1]-A[1],B[2]-A[2]],AP=[P[0]-A[0],P[1]-A[1],P[2]-A[2]];
+      const t=(AP[0]*AB[0]+AP[1]*AB[1]+AP[2]*AB[2])/(AB[0]**2+AB[1]**2+AB[2]**2);
+      const tC=Math.max(0,Math.min(1,t));
+      const C=[A[0]+tC*AB[0],A[1]+tC*AB[1],A[2]+tC*AB[2]];
+      return Math.sqrt((P[0]-C[0])**2+(P[1]-C[1])**2+(P[2]-C[2])**2)<=tolerance;
+    }
+
+    function inHue(r,g,b){
+      const h=rgbToHue(r,g,b),h1=rgbToHue(color1.r,color1.g,color1.b),h2=rgbToHue(color2.r,color2.g,color2.b);
+      let minH=Math.min(h1,h2),maxH=Math.max(h1,h2);
+      if(maxH-minH>180){return(h>=maxH-tolerance||h<=minH+tolerance);}
+      return h>=minH-tolerance&&h<=maxH+tolerance;
+    }
+
+    function processFrame(){
+      ctx.drawImage(video,0,0,canvas.width,canvas.height);
+      const frame=ctx.getImageData(0,0,canvas.width,canvas.height);
+      const data=frame.data;
+      for(let i=0;i<data.length;i+=4){
+        const r=data[i],g=data[i+1],b=data[i+2];
+        let keep=false;
+        if(mode==="range") keep=inRange(r,g,b);
+        else if(mode==="distance") keep=inDistance(r,g,b);
+        else if(mode==="between") keep=inBetween(r,g,b);
+        else if(mode==="hue") keep=inHue(r,g,b);
+        if(!keep){data[i]*=0.3;data[i+1]*=0.3;data[i+2]*=0.3;}
+      }
+      ctx.putImageData(frame,0,0);
       requestAnimationFrame(processFrame);
     }
 
     // Dialog
-    const dialog = document.getElementById("dialog");
-    const r1 = document.getElementById("r1"), g1 = document.getElementById("g1"), b1 = document.getElementById("b1");
-    const r2 = document.getElementById("r2"), g2 = document.getElementById("g2"), b2 = document.getElementById("b2");
-    const tolInput = document.getElementById("tolInput");
-    const preview1 = document.getElementById("preview1");
-    const preview2 = document.getElementById("preview2");
-    const info = document.getElementById("info");
+    const dialog=document.getElementById("dialog");
+    const r1=document.getElementById("r1"),g1=document.getElementById("g1"),b1=document.getElementById("b1");
+    const r2=document.getElementById("r2"),g2=document.getElementById("g2"),b2=document.getElementById("b2");
+    const tolInput=document.getElementById("tolInput"),modeSelect=document.getElementById("modeSelect");
+    const preview1=document.getElementById("preview1"),preview2=document.getElementById("preview2");
 
-    function updatePreviews() {
-      preview1.style.backgroundColor = `rgb(${r1.value},${g1.value},${b1.value})`;
-      preview2.style.backgroundColor = `rgb(${r2.value},${g2.value},${b2.value})`;
+    function updatePreviews(){
+      preview1.style.backgroundColor=`rgb(${r1.value},${g1.value},${b1.value})`;
+      preview2.style.backgroundColor=`rgb(${r2.value},${g2.value},${b2.value})`;
     }
+    [r1,g1,b1,r2,g2,b2].forEach(el=>el.addEventListener("input",updatePreviews));
 
-    [r1,g1,b1,r2,g2,b2].forEach(el => {
-      el.addEventListener("input", updatePreviews);
+    canvas.addEventListener("click",()=>{
+      r1.value=color1.r;g1.value=color1.g;b1.value=color1.b;
+      r2.value=color2.r;g2.value=color2.g;b2.value=color2.b;
+      tolInput.value=tolerance;modeSelect.value=mode;
+      updatePreviews();dialog.style.display="block";
     });
-
-    canvas.addEventListener("click", () => {
-      r1.value = color1.r; g1.value = color1.g; b1.value = color1.b;
-      r2.value = color2.r; g2.value = color2.g; b2.value = color2.b;
-      tolInput.value = tolerance;
-      updatePreviews();
-      dialog.style.display = "block";
+    document.getElementById("okBtn").addEventListener("click",()=>{
+      color1={r:+r1.value,g:+g1.value,b:+b1.value};
+      color2={r:+r2.value,g:+g2.value,b:+b2.value};
+      tolerance=+tolInput.value;mode=modeSelect.value;
+      info.textContent=`Mode: ${mode}, tol=${tolerance}`;
+      dialog.style.display="none";updateBadge();
     });
+    document.getElementById("cancelBtn").addEventListener("click",()=>dialog.style.display="none");
 
-    document.getElementById("okBtn").addEventListener("click", () => {
-      color1 = { r: parseInt(r1.value), g: parseInt(g1.value), b: parseInt(b1.value) };
-      color2 = { r: parseInt(r2.value), g: parseInt(g2.value), b: parseInt(b2.value) };
-      tolerance = parseInt(tolInput.value);
-      info.textContent = `Highlighting between rgb(${color1.r},${color1.g},${color1.b}) and rgb(${color2.r},${color2.g},${color2.b}), tol=${tolerance}`;
-      dialog.style.display = "none";
-    });
-
-    document.getElementById("cancelBtn").addEventListener("click", () => {
-      dialog.style.display = "none";
-    });
-
+    updateBadge();
     startCamera();
   </script>
 </body>
