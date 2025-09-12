@@ -1,13 +1,11 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Full Screen Camera with Highlight Color Picker</title>
+  <title>Full Screen Camera with RGB Range Highlight</title>
   <style>
     html, body {
-      margin: 0;
-      padding: 0;
-      width: 100%;
-      height: 100%;
+      margin: 0; padding: 0;
+      width: 100%; height: 100%;
       overflow: hidden;
       background: black;
       font-family: sans-serif;
@@ -15,15 +13,13 @@
     #canvas {
       position: absolute;
       top: 0; left: 0;
-      width: 100%;
-      height: 100%;
+      width: 100%; height: 100%;
       object-fit: cover;
       touch-action: none;
     }
     #info {
       position: absolute;
-      bottom: 10px;
-      left: 50%;
+      bottom: 10px; left: 50%;
       transform: translateX(-50%);
       background: rgba(0,0,0,0.6);
       color: white;
@@ -33,59 +29,46 @@
     }
     #dialog {
       position: absolute;
-      top: 50%;
-      left: 50%;
+      top: 50%; left: 50%;
       transform: translate(-50%, -50%);
-      background: #222;
-      color: white;
-      width: 80%;
-      max-width: 400px;
+      background: #222; color: white;
+      width: 80%; max-width: 400px;
       height: 50%;
       padding: 16px;
       border-radius: 16px;
       display: none;
       box-shadow: 0 0 30px rgba(0,0,0,0.7);
-      overflow: auto;
-      z-index: 10;
+      overflow: auto; z-index: 10;
     }
     #dialog h3 {
-      margin-top: 0;
-      margin-bottom: 10px;
+      margin: 0 0 10px;
       font-size: 16px;
       text-align: center;
     }
     .row {
       display: flex;
       align-items: center;
-      margin: 10px 0;
+      margin: 8px 0;
     }
-    .row label {
-      width: 20px;
-    }
-    .row input[type=number] {
-      width: 60px;
+    .row label { width: 30px; }
+    .row input {
       margin-left: 8px;
-      background: #333;
-      border: 1px solid #555;
-      color: white;
-      border-radius: 6px;
+      width: 60px;
+      background: #333; border: 1px solid #555;
+      color: white; border-radius: 6px;
       padding: 4px;
     }
-    .row input[type=range] {
-      flex: 1;
-      margin-left: 8px;
-    }
-    #preview {
-      height: 40px;
+    #preview1, #preview2 {
+      height: 30px;
       border-radius: 8px;
-      margin: 10px 0;
+      margin: 6px 0;
     }
     #buttons {
       text-align: center;
       margin-top: 10px;
     }
     #buttons button {
-      margin: 8px;
+      margin: 6px;
       padding: 6px 12px;
       border: none;
       border-radius: 8px;
@@ -98,27 +81,28 @@
 </head>
 <body>
   <canvas id="canvas"></canvas>
-  <div id="info">Tap to choose highlight color</div>
+  <div id="info">Tap to choose RGB range</div>
 
   <!-- Dialog -->
   <div id="dialog">
-    <h3>Choose Color (RGB)</h3>
+    <h3>Choose RGB Range</h3>
+
+    <div><b>Color 1</b></div>
+    <div class="row"><label>R</label><input type="number" id="r1" min="0" max="255"></div>
+    <div class="row"><label>G</label><input type="number" id="g1" min="0" max="255"></div>
+    <div class="row"><label>B</label><input type="number" id="b1" min="0" max="255"></div>
+    <div id="preview1"></div>
+
+    <div><b>Color 2</b></div>
+    <div class="row"><label>R</label><input type="number" id="r2" min="0" max="255"></div>
+    <div class="row"><label>G</label><input type="number" id="g2" min="0" max="255"></div>
+    <div class="row"><label>B</label><input type="number" id="b2" min="0" max="255"></div>
+    <div id="preview2"></div>
+
     <div class="row">
-      <label>R</label>
-      <input type="range" id="rRange" min="0" max="255">
-      <input type="number" id="rInput" min="0" max="255">
+      <label>Tol</label><input type="number" id="tolInput" min="0" max="255" value="40">
     </div>
-    <div class="row">
-      <label>G</label>
-      <input type="range" id="gRange" min="0" max="255">
-      <input type="number" id="gInput" min="0" max="255">
-    </div>
-    <div class="row">
-      <label>B</label>
-      <input type="range" id="bRange" min="0" max="255">
-      <input type="number" id="bInput" min="0" max="255">
-    </div>
-    <div id="preview"></div>
+
     <div id="buttons">
       <button id="okBtn">OK</button>
       <button id="cancelBtn">Cancel</button>
@@ -132,8 +116,9 @@
     video.autoplay = true;
     video.playsInline = true;
 
-    let target = { r: 200, g: 50, b: 50 }; // default red
-    const tolerance = 80;
+    let color1 = { r: 200, g: 50, b: 0 };
+    let color2 = { r: 100, g: 25, b: 11 };
+    let tolerance = 4;
 
     async function startCamera() {
       try {
@@ -147,7 +132,7 @@
           processFrame();
         });
       } catch (err) {
-        console.error("Camera access error:", err);
+        console.error("Camera error:", err);
         alert("Could not access the camera. Use HTTPS or localhost.");
       }
     }
@@ -158,6 +143,21 @@
     }
     window.addEventListener("resize", resizeCanvas);
 
+    function inRange(r, g, b) {
+      const rMin = Math.min(color1.r, color2.r) - tolerance;
+      const rMax = Math.max(color1.r, color2.r) + tolerance;
+      const gMin = Math.min(color1.g, color2.g) - tolerance;
+      const gMax = Math.max(color1.g, color2.g) + tolerance;
+      const bMin = Math.min(color1.b, color2.b) - tolerance;
+      const bMax = Math.max(color1.b, color2.b) + tolerance;
+
+      return (
+        r >= rMin && r <= rMax &&
+        g >= gMin && g <= gMax &&
+        b >= bMin && b <= bMax
+      );
+    }
+
     function processFrame() {
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       const frame = ctx.getImageData(0, 0, canvas.width, canvas.height);
@@ -165,12 +165,7 @@
 
       for (let i = 0; i < data.length; i += 4) {
         const r = data[i], g = data[i+1], b = data[i+2];
-        const dist = Math.sqrt(
-          (r - target.r)**2 +
-          (g - target.g)**2 +
-          (b - target.b)**2
-        );
-        if (dist > tolerance) {
+        if (!inRange(r, g, b)) {
           data[i] *= 0.3;
           data[i+1] *= 0.3;
           data[i+2] *= 0.3;
@@ -181,51 +176,37 @@
       requestAnimationFrame(processFrame);
     }
 
-    // Dialog handling
+    // Dialog
     const dialog = document.getElementById("dialog");
-    const rRange = document.getElementById("rRange");
-    const gRange = document.getElementById("gRange");
-    const bRange = document.getElementById("bRange");
-    const rInput = document.getElementById("rInput");
-    const gInput = document.getElementById("gInput");
-    const bInput = document.getElementById("bInput");
-    const preview = document.getElementById("preview");
+    const r1 = document.getElementById("r1"), g1 = document.getElementById("g1"), b1 = document.getElementById("b1");
+    const r2 = document.getElementById("r2"), g2 = document.getElementById("g2"), b2 = document.getElementById("b2");
+    const tolInput = document.getElementById("tolInput");
+    const preview1 = document.getElementById("preview1");
+    const preview2 = document.getElementById("preview2");
     const info = document.getElementById("info");
 
-    function updatePreview() {
-      preview.style.backgroundColor = `rgb(${rRange.value},${gRange.value},${bRange.value})`;
+    function updatePreviews() {
+      preview1.style.backgroundColor = `rgb(${r1.value},${g1.value},${b1.value})`;
+      preview2.style.backgroundColor = `rgb(${r2.value},${g2.value},${b2.value})`;
     }
 
-    function syncInputs(range, input) {
-      range.addEventListener("input", () => {
-        input.value = range.value;
-        updatePreview();
-      });
-      input.addEventListener("input", () => {
-        range.value = input.value;
-        updatePreview();
-      });
-    }
-
-    syncInputs(rRange, rInput);
-    syncInputs(gRange, gInput);
-    syncInputs(bRange, bInput);
+    [r1,g1,b1,r2,g2,b2].forEach(el => {
+      el.addEventListener("input", updatePreviews);
+    });
 
     canvas.addEventListener("click", () => {
-      rRange.value = target.r; rInput.value = target.r;
-      gRange.value = target.g; gInput.value = target.g;
-      bRange.value = target.b; bInput.value = target.b;
-      updatePreview();
+      r1.value = color1.r; g1.value = color1.g; b1.value = color1.b;
+      r2.value = color2.r; g2.value = color2.g; b2.value = color2.b;
+      tolInput.value = tolerance;
+      updatePreviews();
       dialog.style.display = "block";
     });
 
     document.getElementById("okBtn").addEventListener("click", () => {
-      target = {
-        r: parseInt(rRange.value),
-        g: parseInt(gRange.value),
-        b: parseInt(bRange.value)
-      };
-      info.textContent = `Highlighting rgb(${target.r},${target.g},${target.b})`;
+      color1 = { r: parseInt(r1.value), g: parseInt(g1.value), b: parseInt(b1.value) };
+      color2 = { r: parseInt(r2.value), g: parseInt(g2.value), b: parseInt(b2.value) };
+      tolerance = parseInt(tolInput.value);
+      info.textContent = `Highlighting between rgb(${color1.r},${color1.g},${color1.b}) and rgb(${color2.r},${color2.g},${color2.b}), tol=${tolerance}`;
       dialog.style.display = "none";
     });
 
